@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'ar');
+  const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'en');
 
   useEffect(() => {
     localStorage.setItem('lang', lang);

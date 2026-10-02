@@ -1,15 +1,16 @@
 import { useEffect, useState, Fragment } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowRight, ArrowLeft, Plus, Trash2, Pencil, Wallet, ChevronDown, ChevronUp, Award, X, Loader2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Trash2, Pencil, Wallet, ChevronDown, ChevronUp, Award, X, Loader2, Printer } from 'lucide-react';
 import { useLang } from '../../i18n/LanguageContext';
 import { trainingApi } from '../../api/endpoints';
 import Loader from '../../components/Loader';
 import { getErrorMessage, formatDate } from '../../utils/format';
 import {
-  useL, inputCls, money, methodLabel, PAYMENT_METHODS, PaymentBadge, GroupStatusBadge, StatCard,
+  useL, useLogo, inputCls, money, methodLabel, PAYMENT_METHODS, PaymentBadge, GroupStatusBadge, StatCard,
   blobErrorMessage, openCertificatesWindow,
 } from './shared';
+import { buildGroupReport, openPrintable, resolveLogo } from './printReport';
 
 function Modal({ title, onClose, children }) {
   return (
@@ -34,6 +35,7 @@ export default function TrainingGroupDetail() {
   const L = useL();
   const { lang } = useLang();
   const BackIcon = lang === 'ar' ? ArrowRight : ArrowLeft;
+  const logo = useLogo();
 
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -153,6 +155,17 @@ export default function TrainingGroupDetail() {
     }
   };
 
+  // Printable report of this whole group (students, payments, attendance) -> Save as PDF
+  const printGroup = async () => {
+    try {
+      const att = (await trainingApi.getAttendance(id)).data.data;
+      const html = buildGroupReport(group, att, { lang, logoSrc: resolveLogo(logo.src) });
+      if (!openPrintable(html)) toast.error(L('المتصفح منع النافذة، اسمح بالـ popups وجرّب تاني', 'Popup blocked — allow popups and try again'));
+    } catch (err) {
+      toast.error(getErrorMessage(err, lang));
+    }
+  };
+
   const removeGroup = async () => {
     if (!window.confirm(L('مسح الجروب بكل طلابه ودفعاته؟ مينفعش الرجوع.', 'Delete the group with all its students and payments? This cannot be undone.'))) return;
     try {
@@ -198,6 +211,9 @@ export default function TrainingGroupDetail() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={printGroup} className="rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2 border border-gray-200 text-navy hover:bg-gray-50">
+            <Printer size={16} /> {L('طباعة / PDF', 'Print / PDF')}
+          </button>
           <button
             onClick={() => setEndOpen(true)}
             disabled={group.students.length === 0}

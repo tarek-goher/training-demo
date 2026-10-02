@@ -6,7 +6,7 @@ import { seedData } from './seed';
 const KEY = 'fbi-demo-db-v1';
 const METHODS = ['INSTAPAY', 'ETISALAT_CASH', 'CASH'];
 
-const lang = () => localStorage.getItem('lang') || 'ar';
+const lang = () => localStorage.getItem('lang') || 'en';
 const T = (ar, en) => (lang() === 'ar' ? ar : en);
 const uid = () =>
   globalThis.crypto?.randomUUID ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -474,6 +474,9 @@ export const trainingApi = {
     const byMethod = { INSTAPAY: 0, ETISALAT_CASH: 0, CASH: 0 };
     const unpaid = [];
     const groupRows = [];
+    const paymentRows = [];
+    const attendanceRows = [];
+    const certificateRows = [];
 
     const bucket = (map, key, label) => {
       if (!map.has(key)) map.set(key, { key, label, students: 0, expected: 0, collected: 0, remaining: 0 });
@@ -521,7 +524,21 @@ export const trainingApi = {
 
         s.payments.forEach((p) => {
           byMethod[p.method] += num(p.amount);
+          paymentRows.push({ date: p.paidAt, student: s.name, phone: s.phone, marketer: s.marketer, group: g.name, groupId: g.id, course: course.name, method: p.method, amount: num(p.amount), note: p.note });
         });
+
+        const marksOf = db.attendance.filter((a) => a.studentId === s.id);
+        const present = marksOf.filter((a) => a.present).length;
+        const absent = marksOf.filter((a) => !a.present).length;
+        attendanceRows.push({
+          student: s.name, group: g.name, groupId: g.id, course: course.name, daysCount: g.daysCount, present, absent,
+          notMarked: Math.max(g.daysCount - present - absent, 0),
+          rate: present + absent > 0 ? Math.round((present / (present + absent)) * 100) : null,
+        });
+
+        if (s.certificateSerial) {
+          certificateRows.push({ student: s.name, group: g.name, groupId: g.id, course: course.name, serial: s.certificateSerial, issuedAt: s.certificateIssuedAt });
+        }
 
         if (s.remaining > 0) {
           unpaid.push({ id: s.id, name: s.name, phone: s.phone, marketer: s.marketer, group: g.name, groupId: g.id, course: course.name, total: s.totalPrice, paid: s.paid, remaining: s.remaining, paymentStatus: s.paymentStatus });
@@ -530,6 +547,8 @@ export const trainingApi = {
     }
 
     unpaid.sort((a, b) => b.remaining - a.remaining);
+    paymentRows.sort((a, b) => new Date(b.date) - new Date(a.date));
+    certificateRows.sort((a, b) => new Date(b.issuedAt) - new Date(a.issuedAt));
     return {
       summary,
       byCourse: [...byCourse.values()],
@@ -537,6 +556,9 @@ export const trainingApi = {
       byMethod,
       groups: groupRows,
       unpaid,
+      payments: paymentRows,
+      attendance: attendanceRows,
+      certificates: certificateRows,
     };
   }),
 };
